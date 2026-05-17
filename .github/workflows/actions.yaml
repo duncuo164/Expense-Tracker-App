@@ -13,7 +13,7 @@ jobs:
     steps: 
       - name: Checkout code 
         uses: actions/checkout@v3
-        
+
       - name: Using Commit SHA 
         run: |
           echo "TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
@@ -33,7 +33,7 @@ jobs:
       - name: Trivy scan — table output (informational)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.meta.outputs.image_tag }}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{env.TAG }}
           format: table
           exit-code: "0"         
           ignore-unfixed: true   
@@ -43,7 +43,7 @@ jobs:
       - name: Trivy scan — SARIF for GitHub Security tab
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.meta.outputs.image_tag }}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{env.TAG }}
           format: sarif
           output: trivy-results.sarif
           ignore-unfixed: true
@@ -53,7 +53,7 @@ jobs:
       - name: Trivy scan — block on CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.meta.outputs.image_tag }}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{env.TAG }}
           format: table
           exit-code: "1"        
           ignore-unfixed: true
