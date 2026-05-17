@@ -1,17 +1,17 @@
-FROM node:alpine AS builder
+# Stage 1: builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm i
-
-# COPY  . . 
+RUN npm ci
 COPY src ./src
-COPY public ./public 
-RUN npm run build 
+RUN npm run build
 
 
-# Stage:2 production 
-FROM nginx:alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/build /usr/share/nginx/html
-EXPOSE 80
-ENTRYPOINT [ "nginx", "-g", "daemon off;" ]
+# Stage 2: production
+FROM node:20-alpine AS production
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY --from=builder /app/dist ./dist
+EXPOSE 3000
+ENTRYPOINT ["node", "dist/index.js"]
