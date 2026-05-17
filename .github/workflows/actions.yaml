@@ -6,6 +6,11 @@ on:
 env:
   DOCKER_IMAGE_NAME: express-js-dev-pipeline
 
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -69,10 +74,11 @@ jobs:
           retention-days: 30
  
       - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-results.sarif
+          category: trivy-image-scan
 
       - name: Push to Dockerhub 
         run: |
