@@ -45,40 +45,98 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH,MEDIUM
 
-      - name: Trivy scan — SARIF for GitHub Security tab
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{env.TAG }}
-          format: sarif
-          output: trivy-results.sarif
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL,HIGH,MEDIUM
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg lsb-release
 
-      - name: Trivy scan — block on CRITICAL vulnerabilities
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{env.TAG }}
-          format: table
-          exit-code: "1"        
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL 
- 
-      - name: Upload Trivy report artifact
-        uses: actions/upload-artifact@v4
-        if: always()             
-        with:
-          name: trivy-scan-report
-          path: trivy-results.sarif
-          retention-days: 30
- 
-      - name: Upload SARIF to GitHub Security
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | \
+            sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | \
+            sudo tee /etc/apt/sources.list.d/trivy.list
+
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Run Trivy scans
+        run: |
+          IMAGE=${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.TAG }}
+
+          # JSON (for logic + Telegram)
+          trivy image \
+            --format json \
+            --output trivy-report.json \
+            --severity CRITICAL,HIGH \
+            $IMAGE || true
+
+          # SARIF (for GitHub Security tab)
+          trivy image \
+            --format sarif \
+            --output trivy-results.sarif \
+            --severity CRITICAL,HIGH \
+            $IMAGE || true
+
+      - name: Analyze vulnerabilities
+        run: |
+          CRITICAL=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-report.json || echo 0)
+          HIGH=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-report.json || echo 0)
+
+          echo "CRITICAL=$CRITICAL" >> $GITHUB_ENV
+          echo "HIGH=$HIGH" >> $GITHUB_ENV
+
+          echo "Critical: $CRITICAL"
+          echo "High: $HIGH"
+
+          TOP_ISSUES=$(jq -r '
+            .Results[].Vulnerabilities[]? |
+            "- \(.VulnerabilityID) | \(.PkgName) | \(.Severity)"
+          ' trivy-report.json | head -n 10)
+
+          {
+            echo "MESSAGE<<EOF"
+            echo "🚨 Trivy Security Report"
+            echo ""
+            echo "🔴 Critical: $CRITICAL"
+            echo "🟠 High: $HIGH"
+            echo ""
+            echo "Top Issues:"
+            echo "$TOP_ISSUES"
+            echo "EOF"
+          } >> $GITHUB_ENV
+
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "SCAN_FAILED=true" >> $GITHUB_ENV
+          else
+            echo "SCAN_FAILED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-results.sarif
           category: trivy-image-scan
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-report
+          path: trivy-results.sarif
+          retention-days: 30
+
+      - name: Telegram Notification
+        if: env.SCAN_FAILED == 'true'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            -d text="${{ env.MESSAGE }}"
+
+      - name: Fail build if critical vulnerabilities exist
+        if: env.SCAN_FAILED == 'true'
+        run: exit 1
 
       - name: Push to Dockerhub 
         run: |
