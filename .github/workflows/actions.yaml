@@ -2,7 +2,7 @@ on:
   push:
     branches:
       - "master"
-    
+
 env:
   DOCKER_IMAGE_NAME: express-js-dev-pipeline
 
@@ -15,23 +15,23 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     environment: PIPELINE_ENV
-    steps: 
-      - name: Checkout code 
+    steps:
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Using Commit SHA 
+      - name: Using Commit SHA
         run: |
           echo "TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
 
-      - name: Show the SHA values 
+      - name: Show the SHA values
         run: |
           echo "TAG = ${{env.TAG }}"
 
-      - name: Login to Dockerhub 
+      - name: Login to Dockerhub
         run: |
           echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u ${{secrets.DOCKER_USERNAME}} --password-stdin
 
-      - name: Build and Tag 
+      - name: Build and Tag
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{env.TAG }} .
 
@@ -40,8 +40,8 @@ jobs:
         with:
           image-ref: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{env.TAG }}
           format: table
-          exit-code: "0"         
-          ignore-unfixed: true   
+          exit-code: "0"
+          ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL,HIGH,MEDIUM
 
@@ -138,11 +138,53 @@ jobs:
         if: env.SCAN_FAILED == 'true'
         run: exit 1
 
-      - name: Push to Dockerhub 
+      - name: Push to Dockerhub
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{env.TAG }}
 
-      - name: Logout from Dockerhub 
+      - name: Logout from Dockerhub
         if: always()
         run: |
           docker logout
+
+  deploy-service:
+    needs: build-and-push
+    if: success()
+    runs-on: ubuntu-latest
+    environment: GCP
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set TAG
+        run: echo "TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
+
+      - name: Deploy to GCP VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_IP }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_PRIVATE_KEY }}
+
+          script: |
+            IMAGE="${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.TAG }}"
+
+            echo "Current directory: $(pwd)"
+
+            echo "Stopping old container..."
+            docker stop expense-tracker-application || true
+            docker rm expense-tracker-application || true
+
+            echo "Pulling latest image..."
+            docker pull $IMAGE
+
+            echo "Starting new container..."
+
+            docker run -d \
+              --name expense-tracker-application \
+              --restart always \
+              -p 80:3000 \
+              $IMAGE
+
+            echo "Deployment completed successfully."
