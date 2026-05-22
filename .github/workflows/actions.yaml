@@ -151,7 +151,7 @@ jobs:
     needs: build-and-push
     if: success()
     runs-on: ubuntu-latest
-    environment: GCP
+    environment: PIPELINE_ENV
 
     steps:
       - name: Checkout Code
