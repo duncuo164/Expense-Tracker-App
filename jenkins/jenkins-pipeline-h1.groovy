@@ -1,0 +1,115 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME="expense-tracker-application-image"
+        TAG="${BUILD_NUMBER}" 
+    }
+
+    stages {
+        stage('Clone code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Sonarqube code analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {          
+                sh """
+                    sonar-scanner \
+                    -Dsonar.projectKey=expense-tracker-application \
+                    -Dsonar.projectName="expense-tracker-application" \
+                    -Dsonar.sources=. \
+                    -Dsonar.exclusions=**/node_modules/**,**/vendor/** \
+                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                """
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                script {
+                    timeout(time: 5, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+
+                        if (qg.status != 'OK') {
+                            // send Telegram before aborting
+                            sendTelegramQualityFail(qg.status)
+
+                            // abort the pipeline
+                            error "Quality Gate FAILED: ${qg.status}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            sendTelegramQualityPass()
+        }
+        failure {
+            echo "Pipeline failed — Telegram already sent if quality gate caused it"
+        }
+    }
+}
+
+// helper telegram method
+def sendTelegramQualityFail(String status) {
+    withCredentials([
+        string(credentialsId: 'TELEGRAM_BOT_TOKEN', variable: 'TELEGRAM_BOT_TOKEN'),
+        string(credentialsId: 'TELEGRAM_CHAT_ID',   variable: 'TELEGRAM_CHAT_ID')
+    ]) {
+        def message = "❌ <b>Quality Gate FAILED</b>\n" +
+                      "━━━━━━━━━━━━━━━━━━━\n" +
+                      "<b>Project:</b>  expense-tracker-application\n" +
+                      "<b>Status:</b>   ${status}\n" +
+                      "<b>Branch:</b>   ${env.GIT_BRANCH ?: 'unknown'}\n" +
+                      "<b>Build:</b>    #${env.BUILD_NUMBER}\n" +
+                      "━━━━━━━━━━━━━━━━━━━\n" +
+                      "<b>Issues may include:</b>\n" +
+                      "• New bugs introduced\n" +
+                      "• Security vulnerabilities\n" +
+                      "• Test coverage below 80%\n" +
+                      "• Code duplication above 3%\n" +
+                      "━━━━━━━━━━━━━━━━━━━\n" +
+                      "🔍 <b>Review:</b> ${env.BUILD_URL}console\n" +
+                      "📊 <b>SonarQube:</b> ${env.SONAR_HOST_URL ?: 'http://your-sonar-domain.com'}"
+
+        sh """
+          curl -s -X POST \
+            "https://api.telegram.org/bot\${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="\${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="HTML" \
+            --data-urlencode text="${message}"
+        """
+    }
+}
+
+def sendTelegramQualityPass() {
+    withCredentials([
+        string(credentialsId: 'TELEGRAM_BOT_TOKEN', variable: 'TELEGRAM_BOT_TOKEN'),
+        string(credentialsId: 'TELEGRAM_CHAT_ID',   variable: 'TELEGRAM_CHAT_ID')
+    ]) {
+        def message = "✅ <b>Quality Gate PASSED</b>\n" +
+                      "━━━━━━━━━━━━━━━━━━━\n" +
+                      "<b>Project:</b>  expense-tracker-application\n" +
+                      "<b>Branch:</b>   ${env.GIT_BRANCH ?: 'unknown'}\n" +
+                      "<b>Build:</b>    #${env.BUILD_NUMBER}\n" +
+                      "━━━━━━━━━━━━━━━━━━━\n" +
+                      "All quality checks passed — code is clean ✓\n" +
+                      "━━━━━━━━━━━━━━━━━━━\n" +
+                      "🔍 <b>Logs:</b> ${env.BUILD_URL}console"
+
+        sh """
+          curl -s -X POST \
+            "https://api.telegram.org/bot\${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="\${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="HTML" \
+            --data-urlencode text="${message}"
+        """
+    }
+}
