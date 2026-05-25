@@ -1,7 +1,5 @@
 # Expense Tracker App - DevOps Documentation
 
-![DevOps Architecture](devops-handon.jpg)
-
 ## Overview
 
 The Expense Tracker App is a containerized Node.js/Express application with a complete DevOps pipeline featuring Docker containerization, Docker Hub registry integration, and dual CI/CD platforms: **GitHub Actions** and **Jenkins** for flexible deployment automation.
@@ -29,7 +27,7 @@ This project supports **two independent CI/CD pipelines** for maximum flexibilit
 ### 2. Jenkins Pipeline
 **Self-hosted CI/CD with advanced customization**
 
-![Jenkins Pipeline DevOps](jenkins-pipeline.jpg)
+![Jenkins Pipeline DevOps](devops-jenkins-handon.jpg)
 
 - **Trigger**: Webhook-based on repository push
 - **Execution**: Self-hosted Jenkins server
