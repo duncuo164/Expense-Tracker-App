@@ -1,3 +1,5 @@
+@Library('pipeline-shared-lib') _
+
 pipeline {
     agent any
 
@@ -32,28 +34,57 @@ pipeline {
             steps {
                 script {
                     timeout(time: 5, unit: 'MINUTES') {
+
                         def qg = waitForQualityGate()
 
                         if (qg.status != 'OK') {
-                            // send Telegram before aborting
+
                             sendTelegramQualityFail(qg.status)
 
-                            // abort the pipeline
-                            error "Quality Gate FAILED: ${qg.status}"
+                            currentBuild.result = 'FAILURE'
+
+                            error("""
+                                    PIPELINE FAILED
+                                    ━━━━━━━━━━━━━━━━━━━
+                                    Reason:
+                                    SonarQube Quality Gate failed
+
+                                    Status: ${qg.status}
+
+                                    Pipeline stopped intentionally to prevent:
+                                    - Unsafe deployment
+                                    - Vulnerable code release
+                                    - Low quality code promotion
+
+                                    Check SonarQube report before retrying.
+                                    ━━━━━━━━━━━━━━━━━━━
+                                    """
+                                )
                         }
+
+                        sendTelegramQualityPass()
+                        currentBuild.result = 'SUCCESS'
+                        echo "Quality Gate passed — pipeline continues"
                     }
                 }
             }
         }
-    }
 
-    post {
-        success {
-            sendTelegramQualityPass()
+        stage('Build Image') {
+            when {
+                expression {
+                    currentBuild.result = 'SUCCESS'
+                }
+            }
+
+            steps {
+                script {
+                    dockerBuild('expense-tracker-application-with-jenkins')
+                }
+            }
         }
-        failure {
-            echo "Pipeline failed — Telegram already sent if quality gate caused it"
-        }
+
+
     }
 }
 
