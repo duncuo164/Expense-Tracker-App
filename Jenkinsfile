@@ -103,6 +103,7 @@ pipeline {
                     )
                 ]){
                     sh """
+                        echo "Running on node: ${env.NODE_NAME}"
                         echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
 
                         # Stop and remove existing container if running
