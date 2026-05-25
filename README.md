@@ -27,7 +27,7 @@ This project supports **two independent CI/CD pipelines** for maximum flexibilit
 ### 2. Jenkins Pipeline
 **Self-hosted CI/CD with advanced customization**
 
-![Jenkins Pipeline DevOps](devops-jenkins-handon.jpg)
+![Jenkins Pipeline DevOps](devops-jenkins-handon.png)
 
 - **Trigger**: Webhook-based on repository push
 - **Execution**: Self-hosted Jenkins server
