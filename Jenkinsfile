@@ -90,7 +90,31 @@ pipeline {
             }
         }
 
+        stage('Deploy container') {
+            agent {
+                label '1'
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: "JENKIN_PIPELINE_DOCKER_HUB",
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]){
+                    sh """
+                        echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
 
+                        # Stop and remove existing container if running
+                        docker stop expense-tracker-application || true
+                        docker rm   expense-tracker-application || true
+
+                        docker run -dp 8081:3000 --name expense-tracker-application \
+                            ${DOCKER_USER}/${IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
     }
 }
 
