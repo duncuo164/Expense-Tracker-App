@@ -40,8 +40,6 @@ pipeline {
 
                             sendTelegramQualityFail(qg.status)
 
-                            currentBuild.result = 'FAILURE'
-
                             error("""
                                     PIPELINE FAILED
                                     ━━━━━━━━━━━━━━━━━━━
@@ -62,7 +60,6 @@ pipeline {
                         }
 
                         sendTelegramQualityPass()
-                        currentBuild.result = 'SUCCESS'
                         echo "Quality Gate passed — pipeline continues"
                     }
                 }
@@ -70,31 +67,17 @@ pipeline {
         }
 
         stage('Build Image') {
-            when {
-                expression {
-                    currentBuild.result = 'SUCCESS'
-                }
-            }
-
             steps {
                 script {
-                    def tag = dockerBuild(
+                    env.IMAGE_TAG = dockerBuild(
                         imageName: "expense-tracker-application-image",
                         gitCommit: env.GIT_COMMIT
                     )
-
-                    env.IMAGE_TAG = tag
                 }
             }
         }
 
         stage('Push image to docker hub') {
-            when {
-                expression {
-                    currentBuild.result = 'SUCCESS'
-                }
-            }
-
             steps {
                 script {
                     dockerPush(
