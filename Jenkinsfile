@@ -97,24 +97,41 @@ pipeline {
                 label '1'
             }
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: "JENKIN_PIPELINE_DOCKER_HUB",
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]){
-                    sh """
-                        echo "Running on node: ${env.NODE_NAME}"
-                        echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
+                script {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: "JENKIN_PIPELINE_DOCKER_HUB",
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )
+                    ]){
+                        sh """
+                            echo "Running on node: ${env.NODE_NAME}"
+                            echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
 
-                        # Stop and remove existing container if running
-                        docker stop expense-tracker-application || true
-                        docker rm   expense-tracker-application || true
+                            # Stop and remove existing container if running
+                            docker stop expense-tracker-application || true
+                            docker rm   expense-tracker-application || true
 
-                        docker run -dp 8081:3000 --name expense-tracker-application \
-                            ${DOCKER_USER}/${IMAGE_NAME}:latest
-                    """
+                            docker run -dp 8081:3000 --name expense-tracker-application \
+                                ${DOCKER_USER}/${IMAGE_NAME}:latest
+                        """
+                    }
+
+                    withCredentials([
+                        string(credentialsId: 'TELEGRAM_BOT_TOKEN', variable: 'TELEGRAM_BOT_TOKEN'),
+                        string(credentialsId: 'TELEGRAM_CHAT_ID',   variable: 'TELEGRAM_CHAT_ID')
+                    ]) {
+                        def message = "**Deployment Job running on agent: ${env.NODE_NAME}**"
+
+                            sh """
+                                curl -s -X POST \
+                                    "https://api.telegram.org/bot\${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                                    -d chat_id="\${TELEGRAM_CHAT_ID}" \
+                                    -d parse_mode="markdown" \
+                                    --data-urlencode text="${message}"
+                            """
+                    }
                 }
             }
         }
