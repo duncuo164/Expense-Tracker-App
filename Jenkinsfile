@@ -99,7 +99,8 @@ pipeline {
                 script {
                     dockerPush(
                         imageName: "expense-tracker-application-image",
-                        tag: env.IMAGE_TAG
+                        tag: env.IMAGE_TAG,
+                        credentialId: "JENKIN_PIPELINE_DOCKER_HUB"
                     )
                 }
             }
