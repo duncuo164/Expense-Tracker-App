@@ -9,5 +9,4 @@ userRouter.get('/getAuthenticatedUser' , getAuthenticatedUserController);
 userRouter.put('/editAuthenticatedUser', upload.single('file') , editAuthenticatedUserController)
 
 
-
 export default userRouter;
