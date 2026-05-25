@@ -79,7 +79,10 @@ pipeline {
 
             steps {
                 script {
-                    dockerBuild('expense-tracker-application-with-jenkins')
+                    dockerBuild(
+                        imageName: "expense-tracker-application-image",
+                        gitCommit: env.GIT_COMMIT
+                    )
                 }
             }
         }
