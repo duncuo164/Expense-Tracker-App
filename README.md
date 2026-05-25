@@ -4,7 +4,41 @@
 
 ## Overview
 
-The Expense Tracker App is a containerized Node.js/Express application with a complete DevOps pipeline featuring Docker containerization, Docker Hub registry integration, automated CI/CD workflows, and security scanning. This document focuses on the DevOps infrastructure and deployment strategies.
+The Expense Tracker App is a containerized Node.js/Express application with a complete DevOps pipeline featuring Docker containerization, Docker Hub registry integration, and dual CI/CD platforms: **GitHub Actions** and **Jenkins** for flexible deployment automation.
+
+---
+
+## CI/CD Pipeline Architecture
+
+This project supports **two independent CI/CD pipelines** for maximum flexibility:
+
+### 1. GitHub Actions Pipeline
+**Automated, serverless CI/CD directly from GitHub**
+
+![GitHub Actions DevOps](devops-handon.jpg)
+
+- **Trigger**: Automatic on push to `master` branch
+- **Execution**: GitHub-hosted runners
+- **Features**:
+  - Docker image build and tagging
+  - Security scanning with Trivy
+  - Automated push to Docker Hub
+  - GitHub Security tab integration
+  - No infrastructure overhead
+
+### 2. Jenkins Pipeline
+**Self-hosted CI/CD with advanced customization**
+
+![Jenkins Pipeline DevOps](jenkins-pipeline.jpg)
+
+- **Trigger**: Webhook-based on repository push
+- **Execution**: Self-hosted Jenkins server
+- **Features**:
+  - Declarative/Scripted pipeline definitions
+  - Custom build stages and post-actions
+  - Distributed build agents support
+  - Advanced notifications and integrations
+  - Enterprise-grade job scheduling
 
 ---
 
@@ -16,7 +50,9 @@ The Expense Tracker App is a containerized Node.js/Express application with a co
 - **Web Framework**: Express.js (Node.js v20)
 - **Database**: MySQL
 - **Reverse Proxy**: Nginx
-- **CI/CD**: GitHub Actions
+- **CI/CD Platforms**: 
+  - ✅ GitHub Actions (Cloud)
+  - ✅ Jenkins (Self-hosted)
 - **Container Registry**: Docker Hub
 - **Security Scanning**: Trivy
 - **Language**: JavaScript (ES Modules)
@@ -29,28 +65,179 @@ The Expense Tracker App is a containerized Node.js/Express application with a co
 │   (Master Branch Triggers)          │
 └──────────────┬──────────────────────┘
                │
-               ▼
-┌─────────────────────────────────────┐
-│   GitHub Actions CI/CD Pipeline     │
-│  - Build Docker Image               │
-│  - Security Scan (Trivy)            │
-│  - Push to Docker Hub               │
-└──────────────┬──────────────────────┘
+        ┌──────┴──────┐
+        │             │
+        ▼             ▼
+   ┌────────────┐  ┌──────────────┐
+   │ GitHub     │  │  Jenkins     │
+   │ Actions    │  │  Pipeline    │
+   │ Pipeline   │  │              │
+   └────────────┘  └──────────────┘
+        │             │
+        └──────┬──────┘
                │
                ▼
-┌─────────────────────────────────────┐
-│   Docker Hub Registry               │
-│   (Container Image Storage)         │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│   Production Environment            │
-│  - Docker Container                 │
-│  - Nginx (Reverse Proxy)            │
-│  - MySQL Database                   │
-└─────────────────────────────────────┘
+   ┌─────────────────────────────────┐
+   │   Docker Hub Registry           │
+   │  (Container Image Storage)      │
+   └──────────────┬──────────────────┘
+                  │
+                  ▼
+   ┌─────────────────────────────────┐
+   │  Production Environment         │
+   │  - Docker Container             │
+   │  - Nginx (Reverse Proxy)        │
+   │  - MySQL Database               │
+   └─────────────────────────────────┘
 ```
+
+---
+
+## CI/CD Pipeline Comparison
+
+| Feature | GitHub Actions | Jenkins |
+|---------|----------------|---------|
+| **Setup** | Zero (GitHub-native) | Server required |
+| **Cost** | Free (public repos) | Self-hosted costs |
+| **Triggers** | Push, PR, Schedule | Webhooks, Poll, Cron |
+| **Customization** | Good | Excellent |
+| **Scalability** | GitHub's infrastructure | Dependent on server |
+| **Best For** | Quick, serverless CI/CD | Enterprise deployments |
+
+---
+
+## GitHub Actions Pipeline
+
+### Workflow Trigger
+Automatic on push to `master` branch
+
+### Pipeline Stages
+
+#### 1. Code Checkout & SHA Tagging
+```yaml
+- Checkout code
+- Extract first 8 characters of commit SHA for image tagging
+- Enables commit-based traceability
+```
+
+#### 2. Docker Hub Authentication
+```yaml
+- Authenticate with Docker Hub using secrets
+- Enables push to private/public repositories
+```
+
+#### 3. Build & Tag
+```bash
+docker build -t ${{ secrets.DOCKER_USERNAME }}/express-js-dev-pipeline:$TAG .
+```
+
+#### 4. Security Scanning with Trivy
+**Two-phase approach:**
+
+a) **Informational Table Output**
+- Format: Human-readable table
+- Exit Code: 0 (non-blocking)
+- Severity Levels: CRITICAL, HIGH, MEDIUM
+- Scan Types: OS vulnerabilities, Library vulnerabilities
+
+b) **Structured Security Reports**
+- **JSON Report**: Machine-readable format for parsing/alerting
+- **SARIF Report**: GitHub Security tab integration for visualization
+- Both scan for CRITICAL and HIGH severity vulnerabilities
+
+#### 5. Push to Registry
+- Push tagged image to Docker Hub
+- Retains commit SHA for traceability
+
+### GitHub Actions Configuration
+
+**Required GitHub Secrets**:
+- `DOCKER_USERNAME`: Docker Hub username
+- `DOCKERHUB_PASSWORD`: Docker Hub authentication token
+
+**Environment Variables**:
+- `DOCKER_IMAGE_NAME`: `express-js-dev-pipeline`
+- `TAG`: Commit SHA (first 8 chars)
+
+**Permissions**:
+- `contents: read` - Repository access
+- `security-events: write` - Security tab write access
+- `actions: read` - Actions workflow tracking
+
+---
+
+## Jenkins Pipeline
+
+### Pipeline Trigger
+Webhook-based on repository push (requires webhook configuration)
+
+### Declarative Pipeline Structure
+
+```groovy
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER} .'
+                }
+            }
+        }
+        
+        stage('Security Scan') {
+            steps {
+                script {
+                    sh 'trivy image --format json ${DOCKER_REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}'
+                }
+            }
+        }
+        
+        stage('Push to Registry') {
+            steps {
+                script {
+                    sh 'docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}'
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
+```
+
+### Jenkins Configuration
+
+**Required Credentials**:
+- Docker Hub username & token
+- Repository SSH/HTTPS access
+
+**Environment Variables**:
+- `DOCKER_REGISTRY`: Docker Hub registry URL
+- `IMAGE_NAME`: Container image name
+- `BUILD_NUMBER`: Jenkins build number
+
+**Plugin Requirements**:
+- Docker Pipeline Plugin
+- Trivy Scanner Plugin (optional but recommended)
+- Pipeline: Declarative Agent API
 
 ---
 
@@ -58,7 +245,7 @@ The Expense Tracker App is a containerized Node.js/Express application with a co
 
 ### Multi-Stage Dockerfile
 
-The project uses a **production-optimized Dockerfile** with a single stage:
+The project uses a **production-optimized Dockerfile**:
 
 ```dockerfile
 FROM node:20-alpine AS production
@@ -116,71 +303,6 @@ server {
 - **SPA Fallback**: `try_files` directive routes unmatched paths to index.html
 - **Custom Error Pages**: Graceful error handling for 5xx responses
 - **Static File Serving**: Optimized delivery of frontend assets
-
----
-
-## CI/CD Pipeline
-
-### GitHub Actions Workflow
-
-**Trigger**: Automatic on push to `master` branch
-
-**Pipeline Stages**:
-
-#### 1. Code Checkout & SHA Tagging
-```yaml
-- Checkout code
-- Extract first 8 characters of commit SHA for image tagging
-- Enables commit-based traceability
-```
-
-#### 2. Docker Hub Authentication
-```yaml
-- Authenticate with Docker Hub using secrets
-- Enables push to private/public repositories
-```
-
-#### 3. Build & Tag
-```bash
-docker build -t ${{ secrets.DOCKER_USERNAME }}/express-js-dev-pipeline:$TAG .
-```
-
-#### 4. Security Scanning with Trivy
-**Two-phase approach:**
-
-a) **Informational Table Output**
-- Format: Human-readable table
-- Exit Code: 0 (non-blocking)
-- Severity Levels: CRITICAL, HIGH, MEDIUM
-- Scan Types: OS vulnerabilities, Library vulnerabilities
-
-b) **Structured Security Reports**
-- **JSON Report**: Machine-readable format for parsing/alerting
-- **SARIF Report**: GitHub Security tab integration for visualization
-- Both scan for CRITICAL and HIGH severity vulnerabilities
-
-#### 5. Vulnerability Analysis & Reporting
-- Count CRITICAL and HIGH vulnerabilities
-- Extract top 10 issues with details:
-  - Vulnerability ID
-  - Package Name
-  - Severity Level
-- Prepare for notifications (Telegram integration ready)
-
-### Environment & Secrets Management
-
-**Required GitHub Secrets**:
-- `DOCKER_USERNAME`: Docker Hub username
-- `DOCKERHUB_PASSWORD`: Docker Hub authentication token
-
-**Environment Variables**:
-- `DOCKER_IMAGE_NAME`: `express-js-dev-pipeline`
-- `TAG`: Commit SHA (first 8 chars)
-
-**Permissions**:
-- `contents: read` - Repository access
-- `security-events: write` - Security tab write access
-- `actions: read` - Actions workflow tracking
 
 ---
 
@@ -290,7 +412,7 @@ Located in [src/db/dbConnect.js](src/db/dbConnect.js), the application:
 ### Container Security
 1. **Alpine Base Image**: Minimal attack surface
 2. **Non-root Processes**: Reduced privilege escalation risk
-3. **Trivy Vulnerability Scanning**: Automated security checks
+3. **Trivy Vulnerability Scanning**: Automated security checks in both pipelines
 4. **SHA-based Image Tagging**: Immutable release tracking
 
 ### Application Security
@@ -333,8 +455,8 @@ Located in [src/db/dbConnect.js](src/db/dbConnect.js), the application:
 - Application startup confirmation
 
 ### Security Monitoring
-- Trivy scans: Vulnerability detection
-- GitHub Security tab: Integrated vulnerability tracking
+- Trivy scans: Vulnerability detection in both pipelines
+- GitHub Security tab: Integrated vulnerability tracking (GitHub Actions)
 - SARIF reports: Structured security data
 
 ---
@@ -393,6 +515,8 @@ Located in [src/db/dbConnect.js](src/db/dbConnect.js), the application:
 | Port 3000 already in use | Change port mapping: `-p 8000:3000` |
 | Image build fails | Clear Docker cache: `docker system prune -a` |
 | Security scan failures | Review trivy-report.json for vulnerability details |
+| GitHub Actions not triggering | Verify push is to `master` branch and workflow file exists |
+| Jenkins pipeline not triggering | Confirm webhook is configured in GitHub and Jenkins is accessible |
 
 ---
 
@@ -405,6 +529,7 @@ Located in [src/db/dbConnect.js](src/db/dbConnect.js), the application:
 - [ ] Load testing & performance benchmarks
 - [ ] Blue-green deployment strategy
 - [ ] Container registry scanning integration
+- [ ] Slack/Teams notifications for both CI/CD platforms
 
 ---
 
