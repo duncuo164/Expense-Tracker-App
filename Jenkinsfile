@@ -5,7 +5,6 @@ pipeline {
 
     environment {
         IMAGE_NAME="expense-tracker-application-image"
-        TAG="${BUILD_NUMBER}" 
     }
 
     stages {
@@ -79,9 +78,28 @@ pipeline {
 
             steps {
                 script {
-                    dockerBuild(
+                    def tag = dockerBuild(
                         imageName: "expense-tracker-application-image",
                         gitCommit: env.GIT_COMMIT
+                    )
+
+                    env.IMAGE_TAG = tag
+                }
+            }
+        }
+
+        stage('Push image to docker hub') {
+            when {
+                expression {
+                    currentBuild.result = 'SUCCESS'
+                }
+            }
+
+            steps {
+                script {
+                    dockerPush(
+                        imageName: "expense-tracker-application-image",
+                        tag: env.IMAGE_TAG
                     )
                 }
             }
