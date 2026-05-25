@@ -7,7 +7,7 @@ export const addNewExpenseController = (request,response) => {
         if(error) return response.status(500).json({
             message : "Something Went Wrong"
         })
-        // console.log(row[0].id);
+
         if(!title && !type && !category && !description && !expense_amount){
             return response.status(400).json({
                 message : "Bad Request"
@@ -85,7 +85,7 @@ export const editAuthenticatedUserExpense = (request,response) => {
 export const expensePagination = (request,response) => {
     const authenticatedUsername = request.user.username;
     const limit = 2;
-    const page  = parseInt(request.query.page) | 1;
+    const page  = Number.parseInt(request.query.page) | 1;
     const offset = (page - 1) * limit; // = 10
 
     const sql = `SELECT * FROM expense WHERE user_id = (SELECT id FROM user WHERE username = ?) LIMIT ? OFFSET ?`;
@@ -100,7 +100,3 @@ export const expensePagination = (request,response) => {
         })
     })
 }
-// export const dailyReport = (request,response) => {
-//     const authenticatedUsername = request.user.username;
-//     const sql = `SELECT count(id) as Total_Expense FROM expense WHERE user_id = (SELECT id FROM user WHERE username = ?) AND DATE(created_at) = CURDATE()`;
-// }
