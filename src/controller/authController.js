@@ -11,7 +11,7 @@ export const userRegisterController = async (request,response) => {
     const { username , email , password , balance } = request.body;
 
     //encrypt -> 1. random salt,2.password
-    const randomSalt = await bcrypt.genSalt(parseInt(process.env.round_number));
+    const randomSalt = await bcrypt.genSalt(Number.parseInt(process.env.round_number));
 
     const hashedPassword = await bcrypt.hash(password , randomSalt);
 
