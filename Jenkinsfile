@@ -19,6 +19,8 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {          
                 sh """
+                    echo "Running on node: ${env.NODE_NAME}" 
+
                     sonar-scanner \
                     -Dsonar.projectKey=expense-tracker-application \
                     -Dsonar.projectName="expense-tracker-application" \
