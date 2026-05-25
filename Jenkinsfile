@@ -5,6 +5,7 @@ pipeline {
 
     environment {
         IMAGE_NAME="expense-tracker-application-image"
+        TAG = "${BUILD_NUMBER}"
     }
 
     stages {
@@ -69,7 +70,7 @@ pipeline {
         stage('Build Image') {
             steps {
                 script {
-                    env.IMAGE_TAG = dockerBuild(
+                    dockerBuild(
                         imageName: "expense-tracker-application-image",
                         gitCommit: env.GIT_COMMIT
                     )
@@ -82,7 +83,7 @@ pipeline {
                 script {
                     dockerPush(
                         imageName: "${env.IMAGE_NAME}",
-                        tag: env.IMAGE_TAG,
+                        tag: TAG,
                         credentialId: "JENKIN_PIPELINE_DOCKER_HUB"
                     )
                 }
